@@ -1,0 +1,49 @@
+/* Custom styles for tabs to make them more distinct on mobile */
+.tabs-container {
+  width: 100%;
+  margin-bottom: 2rem;
+}
+
+.tabs-list {
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.tab-trigger {
+  position: relative;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab-trigger[data-state="active"] {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.tab-trigger[data-state="active"]::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30%;
+  height: 3px;
+  background-color: hsl(var(--primary-foreground));
+  border-radius: 3px 3px 0 0;
+}
+
+@media (max-width: 640px) {
+  .tab-trigger {
+    margin-bottom: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  .tab-trigger:last-child {
+    margin-bottom: 0;
+  }
+
+  .tab-trigger[data-state="active"] {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+}
