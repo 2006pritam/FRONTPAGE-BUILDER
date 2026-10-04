@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import html2canvas from "html2canvas"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -42,6 +42,8 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
+const TELECLOUD_API_URL = (process.env.NEXT_PUBLIC_TELECLOUD_API_URL || "https://telecloud-xkas.onrender.com").replace(/\/$/, "")
+
 interface PreviewProps {
   data: FormData
   onClose: () => void
@@ -55,6 +57,21 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingType, setProcessingType] = useState<"pdf" | "png" | "jpg" | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [telecloudActive, setTelecloudActive] = useState(false)
+  const [telecloudSaving, setTelecloudSaving] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${TELECLOUD_API_URL}/api/auth/status`, { credentials: "include" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((status: { authed?: boolean } | null) => {
+        if (!cancelled) setTelecloudActive(status?.authed === true)
+      })
+      .catch(() => {
+        if (!cancelled) setTelecloudActive(false)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   // Helper function to format filename
   const formatFilename = (extension: string) => {
@@ -253,6 +270,44 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
     }
   }
 
+  const handleSaveToTelecloud = async () => {
+    if (!previewRef.current || telecloudSaving || isProcessing) return
+
+    setTelecloudSaving(true)
+    try {
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 1.8,
+        useCORS: true,
+        logging: false,
+        backgroundColor: null,
+        imageTimeout: 0,
+        allowTaint: false,
+        foreignObjectRendering: false,
+      })
+      const { pdf } = await generateOptimizedPDF(canvas, data.orientation as "portrait" | "landscape")
+      const file = new File([pdf.output("arraybuffer")], formatFilename("pdf"), { type: "application/pdf" })
+      const form = new FormData()
+      form.append("file", file)
+      const response = await fetch(`${TELECLOUD_API_URL}/api/files`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      })
+      const result = await response.json().catch(() => ({})) as { error?: string }
+      if (!response.ok) throw new Error(result.error || "Telecloud could not save the file.")
+      toast({ title: "Saved to Telecloud", description: `${file.name} was added to your Telegram drive.` })
+    } catch (error) {
+      console.error("Error saving to Telecloud:", error)
+      toast({
+        title: "Telecloud save failed",
+        description: error instanceof Error ? error.message : "Please sign in to Telecloud and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setTelecloudSaving(false)
+    }
+  }
+
   const pageStyle = {
     width: data.orientation === "portrait" ? "210mm" : "297mm",
     height: data.orientation === "portrait" ? "297mm" : "210mm",
@@ -283,6 +338,11 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
             {onSave && savedRefNumber && (
               <Button onClick={handleUpdateAssignment} disabled={isSaving} variant="default" className="bg-blue-600 hover:bg-blue-700">
                 {isSaving ? "Updating..." : "Update Assignment"}
+              </Button>
+            )}
+            {telecloudActive && (
+              <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
+                {telecloudSaving ? "Saving to Telecloud..." : "Save to Telecloud"}
               </Button>
             )}
             <Select onValueChange={(value) => downloadAsImage(value as "png" | "jpg")} disabled={isProcessing}>

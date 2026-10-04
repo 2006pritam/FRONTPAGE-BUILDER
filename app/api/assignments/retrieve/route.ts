@@ -1,9 +1,8 @@
-import { neon } from '@neondatabase/serverless';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { getDatabase } from '@/app/lib/db';
 
 export async function GET(request: Request) {
   try {
+    const sql = getDatabase();
     const { searchParams } = new URL(request.url);
     const referenceNumber = searchParams.get('ref');
 
