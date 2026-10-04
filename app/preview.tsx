@@ -341,9 +341,14 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
               </Button>
             )}
             {telecloudActive && (
-              <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
-                {telecloudSaving ? "Saving to Telecloud..." : "Save to Telecloud"}
-              </Button>
+              <>
+                <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
+                  {telecloudSaving ? "Saving to Telecloud..." : "Save to Telecloud"}
+                </Button>
+                <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-emerald-600 hover:bg-emerald-700">
+                  {telecloudSaving ? "Saving in Cloud..." : "Save in Cloud"}
+                </Button>
+              </>
             )}
             <Select onValueChange={(value) => downloadAsImage(value as "png" | "jpg")} disabled={isProcessing}>
               <SelectTrigger className="w-[120px]">
