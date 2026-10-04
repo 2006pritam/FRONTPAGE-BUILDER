@@ -64,6 +64,18 @@ interface PreviewProps {
 }
 
 const normalizeApiUrl = (url: string) => url.trim().replace(/\/+$/, "")
+const toSafeHttpUrl = (candidate: string, fallbackBaseUrl: string) => {
+  try {
+    const parsedUrl = new URL(candidate, fallbackBaseUrl)
+    if (parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:") {
+      return parsedUrl.toString()
+    }
+  } catch (error) {
+    console.error("Invalid TeleCloud URL returned:", error)
+  }
+
+  return fallbackBaseUrl
+}
 
 export default function Preview({
   data,
@@ -241,16 +253,15 @@ export default function Preview({
 
     for (const candidate of candidates) {
       if (typeof candidate === "string" && candidate.trim()) {
-        if (candidate.startsWith("http")) return candidate
-        if (candidate.startsWith("/")) return `${baseUrl}${candidate}`
+        return toSafeHttpUrl(candidate, baseUrl)
       }
     }
 
     if (typeof response.id === "string" && response.id.trim()) {
-      return `${baseUrl}/files/${encodeURIComponent(response.id)}`
+      return toSafeHttpUrl(`/files/${encodeURIComponent(response.id)}`, baseUrl)
     }
 
-    return `${baseUrl}/files/${encodeURIComponent(fallbackName)}`
+    return toSafeHttpUrl(`/files/${encodeURIComponent(fallbackName)}`, baseUrl)
   }
 
   const connectTeleCloud = async () => {
