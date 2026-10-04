@@ -58,6 +58,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
   const [processingType, setProcessingType] = useState<"pdf" | "png" | "jpg" | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [telecloudActive, setTelecloudActive] = useState(false)
+  const [telecloudChecked, setTelecloudChecked] = useState(false)
   const [telecloudSaving, setTelecloudSaving] = useState(false)
 
   useEffect(() => {
@@ -69,6 +70,9 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
       })
       .catch(() => {
         if (!cancelled) setTelecloudActive(false)
+      })
+      .finally(() => {
+        if (!cancelled) setTelecloudChecked(true)
       })
     return () => { cancelled = true }
   }, [])
@@ -340,13 +344,13 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
                 {isSaving ? "Updating..." : "Update Assignment"}
               </Button>
             )}
-            {telecloudActive && (
+            {telecloudChecked && (
               <>
-                <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
-                  {telecloudSaving ? "Saving to Telecloud..." : "Save to Telecloud"}
+                <Button onClick={handleSaveToTelecloud} disabled={!telecloudActive || telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
+                  {telecloudSaving ? "Saving to Telecloud..." : telecloudActive ? "Save to Telecloud" : "Save to Telecloud (sign in first)"}
                 </Button>
-                <Button onClick={handleSaveToTelecloud} disabled={telecloudSaving || isProcessing} className="bg-emerald-600 hover:bg-emerald-700">
-                  {telecloudSaving ? "Saving in Cloud..." : "Save in Cloud"}
+                <Button onClick={handleSaveToTelecloud} disabled={!telecloudActive || telecloudSaving || isProcessing} className="bg-emerald-600 hover:bg-emerald-700">
+                  {telecloudSaving ? "Saving in Cloud..." : telecloudActive ? "Save in Cloud" : "Save in Cloud (sign in first)"}
                 </Button>
               </>
             )}
