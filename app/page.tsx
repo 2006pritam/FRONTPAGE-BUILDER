@@ -120,6 +120,13 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
 }
 
+type TeleCloudConfig = {
+  apiUrl: string
+  authToken: string
+}
+
+const TELECLOUD_STORAGE_KEY = "frontpage-builder.telecloud-session"
+
 export default function AssignmentMaker() {
   const [showForm, setShowForm] = useState(false)
   const [showPdfJoiner, setShowPdfJoiner] = useState(false)
@@ -135,6 +142,8 @@ export default function AssignmentMaker() {
   const [retrieveLoading, setRetrieveLoading] = useState(false)
   const [retrieveError, setRetrieveError] = useState("")
   const [saveLoading, setSaveLoading] = useState(false)
+  const [teleCloudConfig, setTeleCloudConfig] = useState<TeleCloudConfig | null>(null)
+  const [isTeleCloudConnected, setIsTeleCloudConnected] = useState(false)
 
   // Add effect to simulate initial loading
   useEffect(() => {
@@ -145,6 +154,39 @@ export default function AssignmentMaker() {
 
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    try {
+      const savedSession = localStorage.getItem(TELECLOUD_STORAGE_KEY)
+      if (!savedSession) return
+
+      const parsedSession = JSON.parse(savedSession) as { config: TeleCloudConfig | null; isConnected: boolean }
+      if (parsedSession.config?.apiUrl) {
+        setTeleCloudConfig(parsedSession.config)
+      }
+      setIsTeleCloudConnected(Boolean(parsedSession.isConnected))
+    } catch (error) {
+      console.error("Failed to restore TeleCloud session:", error)
+    }
+  }, [])
+
+  const handleTeleCloudSessionChange = (session: { config: TeleCloudConfig | null; isConnected: boolean }) => {
+    setTeleCloudConfig(session.config)
+    setIsTeleCloudConnected(session.isConnected)
+
+    if (!session.config) {
+      localStorage.removeItem(TELECLOUD_STORAGE_KEY)
+      return
+    }
+
+    localStorage.setItem(
+      TELECLOUD_STORAGE_KEY,
+      JSON.stringify({
+        config: session.config,
+        isConnected: session.isConnected,
+      }),
+    )
+  }
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -1115,6 +1157,9 @@ export default function AssignmentMaker() {
               onClose={() => setShowPreview(false)}
               onSave={saveAssignment}
               savedRefNumber={referenceNumber}
+              teleCloudConfig={teleCloudConfig}
+              isTeleCloudConnected={isTeleCloudConnected}
+              onTeleCloudSessionChange={handleTeleCloudSessionChange}
             />
           )}
 

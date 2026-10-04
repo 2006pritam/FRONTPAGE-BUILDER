@@ -1,8 +1,10 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import html2canvas from "html2canvas"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import * as z from "zod"
 import { CollegeLogo } from "@/app/components/college-logo"
@@ -40,21 +42,59 @@ const formSchema = z.object({
   showBorder: z.boolean().default(true),
 })
 
-type FormData = z.infer<typeof formSchema>
+type AssignmentFormData = z.infer<typeof formSchema>
 
 interface PreviewProps {
-  data: FormData
+  data: AssignmentFormData
   onClose: () => void
-  onSave?: (data: FormData) => Promise<void>
+  onSave?: (data: AssignmentFormData) => Promise<void>
   savedRefNumber?: string | null
+  teleCloudConfig?: {
+    apiUrl: string
+    authToken: string
+  } | null
+  isTeleCloudConnected?: boolean
+  onTeleCloudSessionChange?: (session: {
+    config: {
+      apiUrl: string
+      authToken: string
+    } | null
+    isConnected: boolean
+  }) => void
 }
 
-export default function Preview({ data, onClose, onSave, savedRefNumber }: PreviewProps) {
+const normalizeApiUrl = (url: string) => url.trim().replace(/\/+$/, "")
+
+export default function Preview({
+  data,
+  onClose,
+  onSave,
+  savedRefNumber,
+  teleCloudConfig,
+  isTeleCloudConnected,
+  onTeleCloudSessionChange,
+}: PreviewProps) {
   const previewRef = useRef<HTMLDivElement>(null)
   const { toast } = useToast()
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingType, setProcessingType] = useState<"pdf" | "png" | "jpg" | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploadingToTeleCloud, setIsUploadingToTeleCloud] = useState(false)
+  const [teleCloudUploadProgress, setTeleCloudUploadProgress] = useState<number | null>(null)
+  const [showTeleCloudDialog, setShowTeleCloudDialog] = useState(false)
+  const [teleCloudUrl, setTeleCloudUrl] = useState(teleCloudConfig?.apiUrl ?? "")
+  const [teleCloudAuthToken, setTeleCloudAuthToken] = useState(teleCloudConfig?.authToken ?? "")
+  const [checkingTeleCloud, setCheckingTeleCloud] = useState(false)
+  const [isTeleCloudConnectedLocally, setIsTeleCloudConnectedLocally] = useState(Boolean(isTeleCloudConnected))
+
+  useEffect(() => {
+    setTeleCloudUrl(teleCloudConfig?.apiUrl ?? "")
+    setTeleCloudAuthToken(teleCloudConfig?.authToken ?? "")
+  }, [teleCloudConfig])
+
+  useEffect(() => {
+    setIsTeleCloudConnectedLocally(Boolean(isTeleCloudConnected))
+  }, [isTeleCloudConnected])
 
   // Helper function to format filename
   const formatFilename = (extension: string) => {
@@ -90,8 +130,247 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
     return Math.round(sizeInBytes / 1024)
   }
 
+  const updateTeleCloudSession = (isConnected: boolean, configOverride?: { apiUrl: string; authToken: string } | null) => {
+    const config = configOverride ?? (teleCloudUrl ? { apiUrl: normalizeApiUrl(teleCloudUrl), authToken: teleCloudAuthToken.trim() } : null)
+
+    setIsTeleCloudConnectedLocally(isConnected)
+    onTeleCloudSessionChange?.({
+      config,
+      isConnected,
+    })
+  }
+
+  const checkTeleCloudConnection = async (apiUrl: string, authToken: string) => {
+    const normalizedUrl = normalizeApiUrl(apiUrl)
+    const headers: Record<string, string> = {}
+
+    if (authToken.trim()) {
+      headers.Authorization = "Bearer " + authToken.trim()
+    }
+
+    const sessionEndpoints = ["/api/session", "/api/auth/session"]
+
+    for (const endpoint of sessionEndpoints) {
+      try {
+        const response = await fetch(`${normalizedUrl}${endpoint}`, {
+          method: "GET",
+          headers,
+          credentials: "include",
+        })
+
+        if (response.ok) {
+          return true
+        }
+      } catch (error) {
+        console.error(`TeleCloud session check failed for ${endpoint}:`, error)
+      }
+    }
+
+    return false
+  }
+
+  useEffect(() => {
+    const verifySavedSession = async () => {
+      if (!teleCloudConfig?.apiUrl || isTeleCloudConnectedLocally) return
+
+      const isConnected = await checkTeleCloudConnection(teleCloudConfig.apiUrl, teleCloudConfig.authToken)
+      updateTeleCloudSession(isConnected, teleCloudConfig)
+    }
+
+    verifySavedSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teleCloudConfig?.apiUrl, teleCloudConfig?.authToken])
+
+  const createPdfFromPreview = async () => {
+    if (!previewRef.current) {
+      throw new Error("Preview not available")
+    }
+
+    const element = previewRef.current
+    const canvas = await html2canvas(element, {
+      scale: 1.8,
+      useCORS: true,
+      logging: false,
+      backgroundColor: null,
+      imageTimeout: 0,
+      allowTaint: false,
+      foreignObjectRendering: false,
+    })
+
+    const { dataUrl: pdfDataUrl, pdf } = await generateOptimizedPDF(canvas, data.orientation as "portrait" | "landscape")
+    const fileSizeKB = calculateFileSizeKB(pdfDataUrl)
+
+    return {
+      pdfDataUrl,
+      pdf,
+      fileSizeKB,
+      filename: formatFilename("pdf"),
+    }
+  }
+
+  const uploadFileToTeleCloud = async (uploadUrl: string, formData: FormData, authToken: string) => {
+    return new Promise<{ status: number; responseText: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("POST", uploadUrl)
+      xhr.withCredentials = true
+
+      if (authToken.trim()) {
+        xhr.setRequestHeader("Authorization", "Bearer " + authToken.trim())
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          setTeleCloudUploadProgress(Math.round((event.loaded / event.total) * 100))
+        }
+      }
+
+      xhr.onload = () => {
+        resolve({
+          status: xhr.status,
+          responseText: xhr.responseText,
+        })
+      }
+
+      xhr.onerror = () => reject(new Error("Unable to reach TeleCloud upload endpoint"))
+      xhr.send(formData)
+    })
+  }
+
+  const getUploadedFileUrl = (baseUrl: string, response: Record<string, unknown>, fallbackName: string) => {
+    const candidates = [response.url, response.fileUrl, response.openUrl, response.link]
+
+    for (const candidate of candidates) {
+      if (typeof candidate === "string" && candidate.trim()) {
+        if (candidate.startsWith("http")) return candidate
+        if (candidate.startsWith("/")) return `${baseUrl}${candidate}`
+      }
+    }
+
+    if (typeof response.id === "string" && response.id.trim()) {
+      return `${baseUrl}/files/${encodeURIComponent(response.id)}`
+    }
+
+    return `${baseUrl}/files/${encodeURIComponent(fallbackName)}`
+  }
+
+  const connectTeleCloud = async () => {
+    if (!teleCloudUrl.trim()) {
+      toast({
+        title: "TeleCloud URL required",
+        description: "Please enter your TeleCloud instance URL.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setCheckingTeleCloud(true)
+
+    const normalizedUrl = normalizeApiUrl(teleCloudUrl)
+    const normalizedConfig = {
+      apiUrl: normalizedUrl,
+      authToken: teleCloudAuthToken.trim(),
+    }
+
+    try {
+      const isConnected = await checkTeleCloudConnection(normalizedUrl, teleCloudAuthToken)
+
+      if (!isConnected) {
+        toast({
+          title: "TeleCloud connection failed",
+          description: "Could not detect an active TeleCloud session. Please authenticate and try again.",
+          variant: "destructive",
+        })
+        updateTeleCloudSession(false, normalizedConfig)
+        return
+      }
+
+      setTeleCloudUrl(normalizedUrl)
+      updateTeleCloudSession(true, normalizedConfig)
+      setShowTeleCloudDialog(false)
+      toast({
+        title: "TeleCloud connected",
+        description: "Your TeleCloud session is active.",
+      })
+    } catch (error) {
+      console.error("Error connecting TeleCloud:", error)
+      toast({
+        title: "TeleCloud connection failed",
+        description: "Unable to connect to TeleCloud. Please check URL and authentication.",
+        variant: "destructive",
+      })
+      updateTeleCloudSession(false, normalizedConfig)
+    } finally {
+      setCheckingTeleCloud(false)
+    }
+  }
+
+  const saveDirectlyToTeleCloud = async () => {
+    if (!teleCloudUrl.trim() || !isTeleCloudConnectedLocally) {
+      setShowTeleCloudDialog(true)
+      return
+    }
+
+    if (isUploadingToTeleCloud || isProcessing) return
+
+    setIsUploadingToTeleCloud(true)
+    setTeleCloudUploadProgress(0)
+
+    try {
+      toast({
+        title: "Preparing upload",
+        description: "Generating PDF for TeleCloud...",
+      })
+
+      const { pdf, filename, fileSizeKB } = await createPdfFromPreview()
+      const formData = new FormData()
+      const pdfBlob = pdf.output("blob")
+      formData.append("file", pdfBlob, filename)
+      formData.append("filename", filename)
+
+      const uploadUrl = `${normalizeApiUrl(teleCloudUrl)}/api/upload`
+      const uploadResponse = await uploadFileToTeleCloud(uploadUrl, formData, teleCloudAuthToken)
+
+      if (uploadResponse.status < 200 || uploadResponse.status >= 300) {
+        updateTeleCloudSession(false)
+        throw new Error(`Upload failed with status ${uploadResponse.status}`)
+      }
+
+      let parsedResponse: Record<string, unknown> = {}
+      if (uploadResponse.responseText) {
+        try {
+          parsedResponse = JSON.parse(uploadResponse.responseText) as Record<string, unknown>
+        } catch (error) {
+          console.error("Unable to parse TeleCloud upload response:", error)
+        }
+      }
+      const openUrl = getUploadedFileUrl(normalizeApiUrl(teleCloudUrl), parsedResponse, filename)
+
+      toast({
+        title: "Uploaded to TeleCloud",
+        description: (
+          <span>
+            {filename} ({fileSizeKB} KB) uploaded.{" "}
+            <a className="underline font-medium" href={openUrl} target="_blank" rel="noreferrer">
+              Open in TeleCloud
+            </a>
+          </span>
+        ),
+      })
+    } catch (error) {
+      console.error("Error uploading to TeleCloud:", error)
+      toast({
+        title: "TeleCloud upload failed",
+        description: "Failed to upload PDF to TeleCloud. Please reconnect and try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingToTeleCloud(false)
+      setTeleCloudUploadProgress(null)
+    }
+  }
+
   const downloadAsPDF = async () => {
-    if (!previewRef.current || isProcessing) return
+    if (!previewRef.current || isProcessing || isUploadingToTeleCloud) return
 
     setIsProcessing(true)
     setProcessingType("pdf")
@@ -103,30 +382,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
         description: "Optimizing file size while preserving quality...",
       })
 
-      const element = previewRef.current
-
-      // Use higher scale for better quality
-      const canvas = await html2canvas(element, {
-        scale: 1.8, // Higher scale for better quality
-        useCORS: true,
-        logging: false,
-        backgroundColor: null,
-        imageTimeout: 0, // No timeout
-        allowTaint: false,
-        foreignObjectRendering: false, // More compatible rendering
-      })
-
-      // Generate optimized PDF
-      const { dataUrl: pdfDataUrl, pdf } = await generateOptimizedPDF(
-        canvas,
-        data.orientation as "portrait" | "landscape",
-      )
-
-      // Calculate file size
-      const fileSizeKB = calculateFileSizeKB(pdfDataUrl)
-
-      // Use the formatted filename
-      const filename = formatFilename("pdf")
+      const { pdf, fileSizeKB, filename } = await createPdfFromPreview()
       pdf.save(filename)
 
       // Show success toast notification with file size
@@ -148,7 +404,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
   }
 
   const downloadAsImage = async (format: "png" | "jpg") => {
-    if (!previewRef.current || isProcessing) return
+    if (!previewRef.current || isProcessing || isUploadingToTeleCloud) return
 
     setIsProcessing(true)
     setProcessingType(format)
@@ -285,7 +541,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
                 {isSaving ? "Updating..." : "Update Assignment"}
               </Button>
             )}
-            <Select onValueChange={(value) => downloadAsImage(value as "png" | "jpg")} disabled={isProcessing}>
+            <Select onValueChange={(value) => downloadAsImage(value as "png" | "jpg")} disabled={isProcessing || isUploadingToTeleCloud}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue placeholder="Image" />
               </SelectTrigger>
@@ -294,7 +550,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
                 <SelectItem value="jpg">JPG</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={downloadAsPDF} disabled={isProcessing}>
+            <Button onClick={downloadAsPDF} disabled={isProcessing || isUploadingToTeleCloud}>
               {isProcessing && processingType === "pdf" ? (
                 <div className="flex items-center">
                   <CustomLoader type="circle" className="mr-2" />
@@ -304,7 +560,24 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
                 "PDF"
               )}
             </Button>
-            <Button variant="outline" onClick={onClose} disabled={isProcessing}>
+            <Button
+              onClick={saveDirectlyToTeleCloud}
+              variant={isTeleCloudConnectedLocally ? "default" : "outline"}
+              disabled={isProcessing || isUploadingToTeleCloud}
+            >
+              {isUploadingToTeleCloud ? (
+                <div className="flex items-center">
+                  <CustomLoader type="circle" className="mr-2" />
+                  <span>{teleCloudUploadProgress !== null ? `Uploading ${teleCloudUploadProgress}%` : "Uploading..."}</span>
+                </div>
+              ) : (
+                "Directly Save to TeleCloud"
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => setShowTeleCloudDialog(true)} disabled={isProcessing || isUploadingToTeleCloud}>
+              {isTeleCloudConnectedLocally ? "TeleCloud Connected" : "Connect TeleCloud"}
+            </Button>
+            <Button variant="outline" onClick={onClose} disabled={isProcessing || isUploadingToTeleCloud}>
               Close
             </Button>
           </div>
@@ -319,6 +592,16 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
             <div>
               <p className="font-medium">Generating {processingType?.toUpperCase()}</p>
               <p>Please wait while we optimize your document...</p>
+            </div>
+          </div>
+        )}
+
+        {isUploadingToTeleCloud && (
+          <div className="mb-4 p-3 bg-primary/10 rounded-md text-sm flex items-center">
+            <CustomLoader type="circle" className="mr-3" />
+            <div>
+              <p className="font-medium">Uploading to TeleCloud</p>
+              <p>{teleCloudUploadProgress !== null ? `${teleCloudUploadProgress}% completed` : "Starting upload..."}</p>
             </div>
           </div>
         )}
@@ -421,6 +704,54 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
             </div>
           </div>
         </div>
+
+        {showTeleCloudDialog && (
+          <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4">
+            <div className="w-full max-w-md rounded-lg border bg-background p-4 shadow-xl">
+              <h3 className="text-lg font-semibold">Connect TeleCloud</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Enter your TeleCloud instance API URL and authentication token (if required).
+              </p>
+
+              <div className="space-y-3 mt-4">
+                <div className="space-y-1">
+                  <Label htmlFor="telecloud-url">TeleCloud URL</Label>
+                  <Input
+                    id="telecloud-url"
+                    placeholder="https://your-telecloud-instance.com"
+                    value={teleCloudUrl}
+                    onChange={(event) => setTeleCloudUrl(event.target.value)}
+                    disabled={checkingTeleCloud}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="telecloud-token">API Token / Auth Key</Label>
+                  <Input
+                    id="telecloud-token"
+                    type="password"
+                    placeholder="Optional, if your TeleCloud requires it"
+                    value={teleCloudAuthToken}
+                    onChange={(event) => setTeleCloudAuthToken(event.target.value)}
+                    disabled={checkingTeleCloud}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTeleCloudDialog(false)}
+                  disabled={checkingTeleCloud}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={connectTeleCloud} disabled={checkingTeleCloud}>
+                  {checkingTeleCloud ? "Connecting..." : "Connect"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
