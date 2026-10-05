@@ -43,6 +43,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>
 
 const TELECLOUD_API_URL = (process.env.NEXT_PUBLIC_TELECLOUD_API_URL || "https://telecloud-xkas.onrender.com").replace(/\/$/, "")
+const TELECLOUD_WEB_URL = (process.env.NEXT_PUBLIC_TELECLOUD_WEB_URL || "https://telecloud-9qu.pages.dev").replace(/\/$/, "")
 
 interface PreviewProps {
   data: FormData
@@ -59,22 +60,23 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
   const [isSaving, setIsSaving] = useState(false)
   const [telecloudActive, setTelecloudActive] = useState(false)
   const [telecloudChecked, setTelecloudChecked] = useState(false)
+  const [telecloudToken, setTelecloudToken] = useState<string | null>(null)
   const [telecloudSaving, setTelecloudSaving] = useState(false)
 
   useEffect(() => {
-    let cancelled = false
-    fetch(`${TELECLOUD_API_URL}/api/auth/status`, { credentials: "include" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((status: { authed?: boolean } | null) => {
-        if (!cancelled) setTelecloudActive(status?.authed === true)
-      })
-      .catch(() => {
-        if (!cancelled) setTelecloudActive(false)
-      })
-      .finally(() => {
-        if (!cancelled) setTelecloudChecked(true)
-      })
-    return () => { cancelled = true }
+    const params = new URLSearchParams(window.location.search)
+    const incomingToken = params.get("telecloud_token")
+    const incomingState = params.get("state")
+    const savedState = window.localStorage.getItem("telecloud-frontpage-state")
+    if (incomingToken && incomingState && incomingState === savedState) {
+      window.localStorage.setItem("telecloud-frontpage-token", incomingToken)
+      window.localStorage.removeItem("telecloud-frontpage-state")
+      window.history.replaceState({}, "", window.location.pathname)
+    }
+    const token = window.localStorage.getItem("telecloud-frontpage-token")
+    setTelecloudToken(token)
+    setTelecloudActive(!!token)
+    setTelecloudChecked(true)
   }, [])
 
   // Helper function to format filename
@@ -274,8 +276,18 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
     }
   }
 
+  const connectTelecloud = () => {
+    const state = crypto.randomUUID()
+    window.localStorage.setItem("telecloud-frontpage-state", state)
+    const returnTo = `${window.location.origin}${window.location.pathname}`
+    const target = new URL(TELECLOUD_WEB_URL)
+    target.searchParams.set("frontpage_return", returnTo)
+    target.searchParams.set("state", state)
+    window.location.assign(target.toString())
+  }
+
   const handleSaveToTelecloud = async () => {
-    if (!previewRef.current || telecloudSaving || isProcessing) return
+    if (!previewRef.current || !telecloudToken || telecloudSaving || isProcessing) return
 
     setTelecloudSaving(true)
     try {
@@ -292,13 +304,16 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
       const file = new File([pdf.output("arraybuffer")], formatFilename("pdf"), { type: "application/pdf" })
       const form = new FormData()
       form.append("file", file)
-      const response = await fetch(`${TELECLOUD_API_URL}/api/files`, {
+      const response = await fetch(`${TELECLOUD_API_URL}/api/integrations/frontpage/upload`, {
         method: "POST",
-        credentials: "include",
+        headers: { Authorization: `Bearer ${telecloudToken}` },
         body: form,
       })
       const result = await response.json().catch(() => ({})) as { error?: string }
       if (!response.ok) throw new Error(result.error || "Telecloud could not save the file.")
+      window.localStorage.removeItem("telecloud-frontpage-token")
+      setTelecloudToken(null)
+      setTelecloudActive(false)
       toast({ title: "Saved to Telecloud", description: `${file.name} was added to your Telegram drive.` })
     } catch (error) {
       console.error("Error saving to Telecloud:", error)
@@ -346,11 +361,16 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
             )}
             {telecloudChecked && (
               <>
+                {!telecloudActive && (
+                  <Button onClick={connectTelecloud} disabled={telecloudSaving || isProcessing} variant="outline">
+                    Connect Telecloud
+                  </Button>
+                )}
                 <Button onClick={handleSaveToTelecloud} disabled={!telecloudActive || telecloudSaving || isProcessing} className="bg-green-600 hover:bg-green-700">
-                  {telecloudSaving ? "Saving to Telecloud..." : telecloudActive ? "Save to Telecloud" : "Save to Telecloud (sign in first)"}
+                  {telecloudSaving ? "Saving to Telecloud..." : "Save to Telecloud"}
                 </Button>
                 <Button onClick={handleSaveToTelecloud} disabled={!telecloudActive || telecloudSaving || isProcessing} className="bg-emerald-600 hover:bg-emerald-700">
-                  {telecloudSaving ? "Saving in Cloud..." : telecloudActive ? "Save in Cloud" : "Save in Cloud (sign in first)"}
+                  {telecloudSaving ? "Saving in Cloud..." : "Save in Cloud"}
                 </Button>
               </>
             )}

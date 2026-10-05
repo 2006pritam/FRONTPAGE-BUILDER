@@ -31,12 +31,13 @@ Continue building your app on:
 
 ## Save to Telecloud
 
-When the current browser has an active Telegram session in Telecloud, the preview screen shows **Save to Telecloud**. It creates a PDF of the front page and uploads it to the signed-in user's Telecloud drive; it does not handle or store Telegram credentials.
+The preview screen includes **Connect Telecloud**, **Save to Telecloud**, and **Save in Cloud**. Connect Telecloud opens the Telecloud login, then returns a short-lived one-time connection token to this builder. The save buttons create a PDF and upload it to the signed-in user's Telecloud drive; they do not handle or store Telegram credentials.
 
 For a custom Telecloud backend, set this build variable in Vercel:
 
 ```env
 NEXT_PUBLIC_TELECLOUD_API_URL=https://your-telecloud-render-service.onrender.com
+NEXT_PUBLIC_TELECLOUD_WEB_URL=https://your-telecloud-pages.pages.dev
 ```
 
 On the Telecloud Render service, add the deployed Frontpage Builder origin to the comma-separated `FRONTEND_ORIGIN` value, for example:
@@ -45,4 +46,4 @@ On the Telecloud Render service, add the deployed Frontpage Builder origin to th
 FRONTEND_ORIGIN=https://your-frontpage-builder.vercel.app,https://your-project.pages.dev
 ```
 
-The user must sign in to Telecloud first in the same browser. The Save button remains hidden when no active Telegram session is detected.
+The user can click **Connect Telecloud** and sign in normally. The one-time token expires after ten minutes and is consumed after one upload.
