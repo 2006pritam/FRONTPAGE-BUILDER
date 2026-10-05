@@ -305,9 +305,9 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
       const file = new File([pdf.output("arraybuffer")], formatFilename("pdf"), { type: "application/pdf" })
       const form = new FormData()
       form.append("file", file)
+      form.append("telecloudToken", telecloudToken)
       const response = await fetch(`${TELECLOUD_API_URL}/api/integrations/frontpage/upload`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${telecloudToken}` },
         body: form,
       })
       const result = await response.json().catch(() => ({})) as { error?: string }
