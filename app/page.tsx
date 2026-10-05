@@ -151,6 +151,29 @@ export default function AssignmentMaker() {
     defaultValues: defaultValues,
   })
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const incomingToken = params.get("telecloud_token")
+    const incomingState = params.get("state")
+    const savedState = window.localStorage.getItem("telecloud-frontpage-state")
+    const pending = window.localStorage.getItem("telecloud-frontpage-pending")
+    if (!incomingToken || !incomingState || incomingState !== savedState || !pending) return
+    try {
+      const parsed = formSchema.safeParse(JSON.parse(pending).data)
+      if (parsed.success) {
+        window.localStorage.setItem("telecloud-frontpage-token", incomingToken)
+        window.localStorage.removeItem("telecloud-frontpage-state")
+        window.localStorage.removeItem("telecloud-frontpage-pending")
+        form.reset(parsed.data)
+        setFormData(parsed.data)
+        setShowPreview(true)
+        window.history.replaceState({}, "", window.location.pathname)
+      }
+    } catch {
+      // Leave the builder on its normal landing page if the pending draft is invalid.
+    }
+  }, [form])
+
   function onSubmit(values: z.infer<typeof formSchema>) {
     setFormData(values)
     setShowPreview(true)

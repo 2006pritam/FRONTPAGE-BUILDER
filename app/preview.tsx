@@ -279,6 +279,7 @@ export default function Preview({ data, onClose, onSave, savedRefNumber }: Previ
   const connectTelecloud = () => {
     const state = crypto.randomUUID()
     window.localStorage.setItem("telecloud-frontpage-state", state)
+    window.localStorage.setItem("telecloud-frontpage-pending", JSON.stringify({ data }))
     const returnTo = `${window.location.origin}${window.location.pathname}`
     const target = new URL(TELECLOUD_WEB_URL)
     target.searchParams.set("frontpage_return", returnTo)
