@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Moon, Sun, BookOpen, FileText, Download, ArrowRight, ChevronRight, FilePlus2, FileOutput } from "lucide-react"
+import { Moon, Sun, BookOpen, FileText, Download, ArrowRight, ChevronRight, FilePlus2, FileOutput, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Preview from "./preview"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -346,7 +346,7 @@ export default function AssignmentMaker() {
                   transition={{ delay: 0.8, duration: 0.5 }}
                   className="flex flex-col items-center gap-4"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <Button
                       size="lg"
                       onClick={() => setShowForm(true)}
@@ -377,6 +377,23 @@ export default function AssignmentMaker() {
                       <span className="relative z-10">Convert Documents</span>
                       <FileOutput className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10" />
                       <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                    </Button>
+
+                    <Button
+                      asChild
+                      size="lg"
+                      variant="outline"
+                      className="text-lg group px-6 py-6 h-auto relative overflow-hidden"
+                    >
+                      <a href="https://filehelper.online/" target="_blank" rel="noopener noreferrer">
+                        <span className="relative z-10">FileHelper.online</span>
+                        <ExternalLink
+                          aria-hidden="true"
+                          className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10"
+                        />
+                        <span className="sr-only">Opens in a new tab.</span>
+                        <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                      </a>
                     </Button>
                   </div>
                   <p className="text-sm text-foreground mt-2 drop-shadow-sm">No registration required. Free to use.</p>
