@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Moon, Sun, BookOpen, FileText, Download, ArrowRight, ChevronRight, FilePlus2, FileOutput } from "lucide-react"
+import { Moon, Sun, BookOpen, FileText, Download, ArrowRight, ChevronRight, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Preview from "./preview"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,8 +15,6 @@ import * as z from "zod"
 import { Footer } from "./components/footer"
 import { Background } from "./components/background"
 import { CollegeLogo } from "./components/college-logo"
-import { PdfJoiner } from "./components/pdf-joiner"
-import { PdfConverter } from "./components/pdf-converter"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NeonLogoButton } from "./components/neon-logo-button"
 import "./components/custom-tabs.css"
@@ -28,6 +26,7 @@ import "./components/turnstile.css"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { LoaderGroup } from "./components/custom-loader"
+import { ContactForm } from "./components/contact-form"
 
 const colleges = [
   "SUPREME KNOWLEDGE FOUNDATION GROUP OF INSTITUTIONS",
@@ -122,8 +121,7 @@ const itemVariants = {
 
 export default function AssignmentMaker() {
   const [showForm, setShowForm] = useState(false)
-  const [showPdfJoiner, setShowPdfJoiner] = useState(false)
-  const [showPdfConverter, setShowPdfConverter] = useState(false)
+  const [showContactForm, setShowContactForm] = useState(false)
   const [isDark, setIsDark] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null)
@@ -242,8 +240,7 @@ export default function AssignmentMaker() {
   // Helper function to go back to home
   const goToHome = () => {
     setShowForm(false)
-    setShowPdfJoiner(false)
-    setShowPdfConverter(false)
+    setShowContactForm(false)
   }
 
   // Function to handle file input focus
@@ -293,7 +290,9 @@ export default function AssignmentMaker() {
           </div>
 
           <AnimatePresence mode="wait">
-            {!showForm && !showPdfJoiner && !showPdfConverter ? (
+            {showContactForm ? (
+              <ContactForm key="contact" onBack={goToHome} />
+            ) : !showForm ? (
               <motion.div
                 key="landing"
                 initial={{ opacity: 0 }}
@@ -369,7 +368,7 @@ export default function AssignmentMaker() {
                   transition={{ delay: 0.8, duration: 0.5 }}
                   className="flex flex-col items-center gap-4"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Button
                       size="lg"
                       onClick={() => setShowForm(true)}
@@ -381,81 +380,35 @@ export default function AssignmentMaker() {
                     </Button>
 
                     <Button
+                      asChild
                       size="lg"
                       variant="outline"
-                      onClick={() => setShowPdfJoiner(true)}
                       className="text-lg group px-6 py-6 h-auto relative overflow-hidden"
                     >
-                      <span className="relative z-10">Join PDF Files</span>
-                      <FilePlus2 className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10" />
-                      <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                      <a href="https://filehelper.online/" target="_blank" rel="noopener noreferrer">
+                        <span className="relative z-10">FileHelper.online</span>
+                        <ExternalLink
+                          aria-hidden="true"
+                          className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10"
+                        />
+                        <span className="sr-only">Opens in a new tab.</span>
+                        <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                      </a>
                     </Button>
 
                     <Button
                       size="lg"
+                      onClick={() => setShowContactForm(true)}
                       variant="secondary"
-                      onClick={() => setShowPdfConverter(true)}
-                      className="text-lg group px-6 py-6 h-auto relative overflow-hidden"
+                      className="text-lg group px-6 py-6 h-auto relative overflow-hidden sm:col-span-2 sm:w-fit sm:justify-self-center lg:col-span-1 lg:w-full"
                     >
-                      <span className="relative z-10">Convert Documents</span>
-                      <FileOutput className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10" />
+                      <span className="relative z-10">Contact &amp; Feedback</span>
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10" />
                       <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
                     </Button>
                   </div>
                   <p className="text-sm text-foreground mt-2 drop-shadow-sm">No registration required. Free to use.</p>
                 </motion.div>
-              </motion.div>
-            ) : showPdfJoiner ? (
-              <motion.div
-                key="pdf-joiner"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <Card className="bg-background/95 shadow-lg border-t-4 border-t-primary">
-                  <CardHeader>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <CardTitle className="text-2xl">PDF Joiner</CardTitle>
-                        <CardDescription>Merge two PDF files into one document</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={goToHome} className="group bg-transparent">
-                        <span>Back to Home</span>
-                        <ChevronRight className="ml-1 h-4 w-4 group-hover:-rotate-45 transition-transform" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <PdfJoiner />
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ) : showPdfConverter ? (
-              <motion.div
-                key="pdf-converter"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <Card className="bg-background/95 shadow-lg border-t-4 border-t-primary">
-                  <CardHeader>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div>
-                        <CardTitle className="text-2xl">Document Converter</CardTitle>
-                        <CardDescription>Convert between PDF, Word, PowerPoint, and Excel formats</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={goToHome} className="group bg-transparent">
-                        <span>Back to Home</span>
-                        <ChevronRight className="ml-1 h-4 w-4 group-hover:-rotate-45 transition-transform" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <PdfConverter />
-                  </CardContent>
-                </Card>
               </motion.div>
             ) : (
               <motion.div
