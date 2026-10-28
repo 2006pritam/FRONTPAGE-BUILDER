@@ -74,3 +74,68 @@
     @apply bg-background text-foreground;
   }
 }
+
+.binary-rain {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.binary-rain__column {
+  position: absolute;
+  top: -65%;
+  display: block;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  white-space: pre;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: clamp(0.625rem, 1.1vw, 0.875rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  animation: binary-rain-fall linear infinite;
+}
+
+.binary-rain[data-theme="dark"] .binary-rain__column {
+  background-image: linear-gradient(
+    180deg,
+    rgba(209, 250, 229, 0.78) 0%,
+    rgba(52, 211, 153, 0.54) 13%,
+    rgba(16, 185, 129, 0.22) 68%,
+    rgba(16, 185, 129, 0) 100%
+  );
+  text-shadow: 0 0 10px rgba(52, 211, 153, 0.2);
+}
+
+.binary-rain[data-theme="light"] .binary-rain__column {
+  background-image: linear-gradient(
+    180deg,
+    rgba(6, 95, 70, 0.72) 0%,
+    rgba(5, 150, 105, 0.42) 15%,
+    rgba(16, 185, 129, 0.16) 70%,
+    rgba(16, 185, 129, 0) 100%
+  );
+  text-shadow: 0 0 10px rgba(5, 150, 105, 0.12);
+}
+
+@keyframes binary-rain-fall {
+  from {
+    transform: translate3d(-50%, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 185vh, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .binary-rain__column {
+    top: 5%;
+    animation: none;
+  }
+}
