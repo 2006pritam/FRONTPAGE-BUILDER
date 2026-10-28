@@ -26,6 +26,7 @@ import "./components/turnstile.css"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { LoaderGroup } from "./components/custom-loader"
+import { ContactForm } from "./components/contact-form"
 
 const colleges = [
   "SUPREME KNOWLEDGE FOUNDATION GROUP OF INSTITUTIONS",
@@ -120,6 +121,7 @@ const itemVariants = {
 
 export default function AssignmentMaker() {
   const [showForm, setShowForm] = useState(false)
+  const [showContactForm, setShowContactForm] = useState(false)
   const [isDark, setIsDark] = useState(true)
   const [showPreview, setShowPreview] = useState(false)
   const [formData, setFormData] = useState<z.infer<typeof formSchema> | null>(null)
@@ -215,6 +217,7 @@ export default function AssignmentMaker() {
   // Helper function to go back to home
   const goToHome = () => {
     setShowForm(false)
+    setShowContactForm(false)
   }
 
   // Function to handle file input focus
@@ -264,7 +267,9 @@ export default function AssignmentMaker() {
           </div>
 
           <AnimatePresence mode="wait">
-            {!showForm ? (
+            {showContactForm ? (
+              <ContactForm key="contact" onBack={goToHome} />
+            ) : !showForm ? (
               <motion.div
                 key="landing"
                 initial={{ opacity: 0 }}
@@ -340,7 +345,7 @@ export default function AssignmentMaker() {
                   transition={{ delay: 0.8, duration: 0.5 }}
                   className="flex flex-col items-center gap-4"
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <Button
                       size="lg"
                       onClick={() => setShowForm(true)}
@@ -367,11 +372,23 @@ export default function AssignmentMaker() {
                         <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
                       </a>
                     </Button>
+
+                    <Button
+                      size="lg"
+                      onClick={() => setShowContactForm(true)}
+                      variant="secondary"
+                      className="text-lg group px-6 py-6 h-auto relative overflow-hidden sm:col-span-2 sm:w-fit sm:justify-self-center lg:col-span-1 lg:w-full"
+                    >
+                      <span className="relative z-10">Contact &amp; Feedback</span>
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform relative z-10" />
+                      <div className="absolute inset-0 bg-primary/10 transform -skew-x-12 group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                    </Button>
                   </div>
                   <p className="text-sm text-foreground mt-2 drop-shadow-sm">No registration required. Free to use.</p>
                 </motion.div>
               </motion.div>
-            ) : (              <motion.div
+            ) : (
+              <motion.div
                 key="form"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
