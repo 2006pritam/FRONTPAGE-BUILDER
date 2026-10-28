@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Footer } from "./components/footer"
 import { Background } from "./components/background"
+import { BinaryRain } from "./components/binary-rain"
 import { CollegeLogo } from "./components/college-logo"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { NeonLogoButton } from "./components/neon-logo-button"
@@ -270,7 +271,8 @@ export default function AssignmentMaker() {
 
   return (
     <Background isDark={isDark}>
-      <div className="min-h-screen p-4">
+      {!showForm && !showContactForm && <BinaryRain isDark={isDark} />}
+      <div className="relative z-10 min-h-screen p-4">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <motion.div
